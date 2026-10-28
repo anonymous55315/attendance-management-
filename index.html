@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roll Call - Attendance</title>
+<style>
+  :root {
+    --ink: #14213d;
+    --ink-soft: #4b5b78;
+    --paper: #eef2f7;
+    --sheet: #ffffff;
+    --line: #d6dde8;
+    --present: #0f766e;
+    --late: #b45309;
+    --absent: #b91c1c;
+    --rail: #14213d;
+    --focus: #2563eb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { display: flex; background: var(--paper); color: var(--ink);
+         font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; font-size: 15px; }
+  h1, h2, .brand { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  /* Left rail */
+  .rail { width: 220px; background: var(--rail); color: #dbe4f3; padding: 24px 14px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+  .brand { font-size: 22px; color: #fff; padding: 0 10px 18px; line-height: 1.1; }
+  .brand small { display: block; font-family: "Segoe UI", system-ui, sans-serif; font-weight: 400; font-size: 12px; color: #9fb0cf; margin-top: 6px; }
+  .rail button { background: none; border: 0; text-align: left; padding: 11px 12px; border-radius: 6px; cursor: pointer; color: inherit; border-left: 4px solid transparent; }
+  .rail button:hover { background: rgba(255,255,255,.07); }
+  .rail button.on { background: rgba(255,255,255,.12); color: #fff; border-left-color: #5eead4; font-weight: 600; }
+
+  /* Main */
+  main { flex: 1; padding: 28px 36px; overflow-y: auto; min-width: 0; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .sub { color: var(--ink-soft); margin: 0 0 22px; }
+  .view { display: none; max-width: 900px; }
+  .view.on { display: block; }
+
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  input, select { background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; }
+  .btn { background: var(--ink); color: #fff; border: 0; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-weight: 600; }
+  .btn:hover { background: #22345e; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+  .btn.ghost:hover { background: rgba(20,33,61,.07); }
+  .spacer { flex: 1; }
+
+  /* Tally strip */
+  .tally { display: flex; gap: 22px; margin-bottom: 14px; font-size: 15px; }
+  .tally b { font-size: 22px; font-family: Georgia, serif; margin-right: 4px; }
+  .t-p b { color: var(--present); } .t-l b { color: var(--late); } .t-a b { color: var(--absent); }
+
+  /* Register table */
+  .sheet { background: var(--sheet); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-weight: 600; font-size: 13px; color: var(--ink-soft); padding: 11px 14px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  td.roll { font-variant-numeric: tabular-nums; color: var(--ink-soft); width: 110px; }
+  td.empty { text-align: center; color: var(--ink-soft); padding: 28px; }
+  td a { color: var(--ink); font-weight: 600; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+
+  /* P / L / A switch */
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { background: var(--sheet); border: 0; padding: 7px 16px; cursor: pointer; font-weight: 600; border-right: 1px solid var(--line); color: var(--ink-soft); }
+  .seg button:last-child { border-right: 0; }
+  .seg button:hover { background: #eef2f7; }
+  .seg button.p.on { background: var(--present); color: #fff; }
+  .seg button.l.on { background: var(--late); color: #fff; }
+  .seg button.a.on { background: var(--absent); color: #fff; }
+
+  .tag { font-weight: 600; } .tag.present { color: var(--present); } .tag.late { color: var(--late); } .tag.absent { color: var(--absent); }
+  .del { background: none; border: 0; color: var(--absent); cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+  .del:hover { background: #fee2e2; }
+
+  /* Report */
+  .profile { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+  .ring { --p: 0; width: 120px; height: 120px; border-radius: 50%; flex-shrink: 0;
+          background: conic-gradient(var(--present) calc(var(--p) * 1%), #d6dde8 0); display: grid; place-items: center; }
+  .ring.low { background: conic-gradient(var(--absent) calc(var(--p) * 1%), #d6dde8 0); }
+  .ring span { width: 92px; height: 92px; border-radius: 50%; background: var(--paper); display: grid; place-items: center; font-family: Georgia, serif; font-size: 24px; font-weight: 700; }
+  .profile h2 { margin: 0 0 4px; font-size: 22px; }
+  .counts { display: flex; gap: 20px; margin-top: 10px; }
+  .counts div { color: var(--ink-soft); font-size: 13px; }
+  .counts b { display: block; font-size: 20px; font-family: Georgia, serif; color: var(--ink); }
+  .month { margin-bottom: 14px; }
+  .month h3 { margin: 0 0 6px; font-size: 14px; color: var(--ink-soft); font-weight: 600; }
+  .days { display: flex; flex-wrap: wrap; gap: 5px; }
+  .day { width: 34px; height: 34px; border-radius: 6px; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 600; }
+  .day.present { background: var(--present); } .day.late { background: var(--late); } .day.absent { background: var(--absent); }
+  .key { display: flex; gap: 16px; font-size: 13px; color: var(--ink-soft); margin: 4px 0 18px; }
+  .key i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+  /* Overview bars */
+  .meter { height: 10px; background: #e3e8f0; border-radius: 5px; overflow: hidden; min-width: 120px; }
+  .meter div { height: 100%; background: var(--present); }
+  .meter.low div { background: var(--absent); }
+  .pct { font-weight: 700; font-variant-numeric: tabular-nums; width: 64px; }
+
+  #toast { position: fixed; right: 24px; bottom: 24px; background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 6px; opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; max-width: 320px; }
+  #toast.show { opacity: 1; transform: none; }
+  #toast.err { background: var(--absent); }
+
+  @media (max-width: 760px) {
+    body { flex-direction: column; }
+    .rail { width: 100%; flex-direction: row; flex-wrap: wrap; padding: 12px; align-items: center; }
+    .brand { padding: 0 12px 0 4px; } .brand small { display: none; }
+    .rail button { border-left: 0; border-bottom: 3px solid transparent; padding: 8px 10px; }
+    .rail button.on { border-bottom-color: #5eead4; }
+    main { padding: 20px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+</style>
+</head>
+<body>
+
+<aside class="rail">
+  <div class="brand">Roll Call<small>Class attendance register</small></div>
+  <button class="on" data-view="roll">Take attendance</button>
+  <button data-view="students">Students</button>
+  <button data-view="report">Student report</button>
+  <button data-view="overview">Class overview</button>
+</aside>
+
+<main>
+  <!-- Take attendance -->
+  <section id="roll" class="view on">
+    <h1>Take attendance</h1>
+    <p class="sub">Choose a date, mark each student, then save the register.</p>
+    <div class="bar">
+      <input type="date" id="rollDate" aria-label="Date">
+      <button class="btn ghost" id="allPresent">Mark everyone present</button>
+      <span class="spacer"></span>
+      <button class="btn" id="saveRoll">Save attendance</button>
+    </div>
+    <div class="tally">
+      <span class="t-p"><b id="cP">0</b>present</span>
+      <span class="t-l"><b id="cL">0</b>late</span>
+      <span class="t-a"><b id="cA">0</b>absent</span>
+      <span><b id="cN">0</b>not marked</span>
+    </div>
+    <div class="sheet"><table>
+      <thead><tr><th>Roll no.</th><th>Name</th><th>Status</th></tr></thead>
+      <tbody id="rollBody"></tbody>
+    </table></div>
+  </section>
+
+  <!-- Students -->
+  <section id="students" class="view">
+    <h1>Students</h1>
+    <p class="sub">Add the students in your class. Select a name to see their attendance.</p>
+    <div class="bar">
+      <input id="sRoll" placeholder="Roll no." size="10">
+      <input id="sName" placeholder="Full name" size="22">
+      <input id="sCourse" placeholder="Course (optional)" size="18">
+      <button class="btn" id="addStudent">Add student</button>
+    </div>
+    <div class="sheet"><table>
+      <thead><tr><th>Roll no.</th><th>Name</th><th>Course</th><th></th></tr></thead>
+      <tbody id="studentBody"></tbody>
+    </table></div>
+  </section>
+
+  <!-- Report -->
+  <section id="report" class="view">
+    <h1>Student report</h1>
+    <p class="sub">See one student's attendance, for all dates or a date range.</p>
+    <div class="bar">
+      <select id="repStudent" aria-label="Student"></select>
+      <label>From <input type="date" id="repStart"></label>
+      <label>To <input type="date" id="repEnd"></label>
+      <button class="btn" id="showReport">Show report</button>
+    </div>
+    <div id="repOut"></div>
+  </section>
+
+  <!-- Overview -->
+  <section id="overview" class="view">
+    <h1>Class overview</h1>
+    <p class="sub">Attendance percentage for every student. Late counts as attended.</p>
+    <div class="bar">
+      <label>Flag students below <input type="number" id="thr" value="75" min="0" max="100" style="width:80px"> %</label>
+    </div>
+    <div class="sheet"><table>
+      <thead><tr><th>Roll no.</th><th>Name</th><th>Days</th><th>Absent</th><th>Attendance</th><th></th></tr></thead>
+      <tbody id="ovBody"></tbody>
+    </table></div>
+  </section>
+</main>
+
+<div id="toast" role="status"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let students = [];
+let marks = {};      // student_id -> status chosen on screen
+let existing = {};   // student_id -> saved record for the chosen date
+
+function toast(text, bad = false) {
+  const t = $("toast");
+  t.textContent = text;
+  t.className = "show" + (bad ? " err" : "");
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => t.className = "", 3200);
+}
+
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Request failed. Please try again.");
+  return data;
+}
+const send = (url, method, body) => api(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+/* ---------- navigation ---------- */
+document.querySelectorAll(".rail button").forEach(b => b.onclick = () => openView(b.dataset.view));
+function openView(v) {
+  document.querySelectorAll(".rail button").forEach(x => x.classList.toggle("on", x.dataset.view === v));
+  document.querySelectorAll(".view").forEach(x => x.classList.toggle("on", x.id === v));
+  if (v === "overview") loadOverview();
+  if (v === "roll") loadRoll();
+}
+
+/* ---------- students ---------- */
+async function loadStudents() {
+  students = await api("/students");
+  $("studentBody").innerHTML = students.map(s => `
+    <tr><td class="roll">${esc(s.roll_no)}</td>
+    <td><a onclick="openReport(${s.id})">${esc(s.name)}</a></td>
+    <td>${esc(s.course) || "-"}</td>
+    <td><button class="del" onclick="removeStudent(${s.id})">Delete</button></td></tr>`).join("")
+    || `<tr><td class="empty" colspan="4">No students yet. Add your first student above.</td></tr>`;
+  $("repStudent").innerHTML = students.map(s => `<option value="${s.id}">${esc(s.roll_no)} - ${esc(s.name)}</option>`).join("");
+}
+
+$("addStudent").onclick = async () => {
+  const roll_no = $("sRoll").value.trim(), name = $("sName").value.trim(), course = $("sCourse").value.trim();
+  if (!roll_no || !name) return toast("Enter a roll number and a name.", true);
+  try {
+    await send("/students", "POST", { roll_no, name, course: course || null });
+    $("sRoll").value = $("sName").value = $("sCourse").value = "";
+    toast("Student added.");
+    await loadStudents();
+  } catch (e) { toast(e.message, true); }
+};
+
+async function removeStudent(id) {
+  if (!confirm("Delete this student and all of their attendance records?")) return;
+  try { await api("/students/" + id, { method: "DELETE" }); toast("Student deleted."); await loadStudents(); }
+  catch (e) { toast(e.message, true); }
+}
+
+/* ---------- take attendance ---------- */
+async function loadRoll() {
+  const day = $("rollDate").value;
+  marks = {}; existing = {};
+  if (day) {
+    const recs = await api("/attendance/date/" + day);
+    recs.forEach(r => { existing[r.student_id] = r; marks[r.student_id] = r.status; });
+  }
+  drawRoll();
+}
+
+function drawRoll() {
+  $("rollBody").innerHTML = students.map(s => {
+    const m = marks[s.id];
+    const btn = (code, label, st) => `<button class="${code}${m === st ? " on" : ""}" onclick="setMark(${s.id},'${st}')">${label}</button>`;
+    return `<tr><td class="roll">${esc(s.roll_no)}</td><td>${esc(s.name)}</td>
+      <td><div class="seg" role="group" aria-label="Status for ${esc(s.name)}">
+        ${btn("p", "Present", "present")}${btn("l", "Late", "late")}${btn("a", "Absent", "absent")}
+      </div></td></tr>`;
+  }).join("") || `<tr><td class="empty" colspan="3">Add students first, then come back to take attendance.</td></tr>`;
+  const vals = students.map(s => marks[s.id]);
+  $("cP").textContent = vals.filter(v => v === "present").length;
+  $("cL").textContent = vals.filter(v => v === "late").length;
+  $("cA").textContent = vals.filter(v => v === "absent").length;
+  $("cN").textContent = vals.filter(v => !v).length;
+}
+
+function setMark(id, status) { marks[id] = status; drawRoll(); }
+
+$("allPresent").onclick = () => { students.forEach(s => marks[s.id] = "present"); drawRoll(); };
+$("rollDate").onchange = loadRoll;
+
+$("saveRoll").onclick = async () => {
+  const date = $("rollDate").value;
+  if (!date) return toast("Choose a date first.", true);
+  const jobs = [];
+  students.forEach(s => {
+    const status = marks[s.id];
+    if (!status) return;
+    const old = existing[s.id];
+    if (!old) jobs.push(send("/attendance", "POST", { student_id: s.id, date, status }));
+    else if (old.status !== status) jobs.push(send("/attendance/" + old.id, "PUT", { status, remark: old.remark }));
+  });
+  if (!jobs.length) return toast("Nothing new to save.");
+  try {
+    await Promise.all(jobs);
+    toast(`Attendance saved for ${jobs.length} student${jobs.length > 1 ? "s" : ""}.`);
+    await loadRoll();
+  } catch (e) { toast(e.message, true); }
+};
+
+/* ---------- student report ---------- */
+function openReport(id) {
+  openView("report");
+  $("repStudent").value = id;
+  showReport();
+}
+
+async function showReport() {
+  const id = $("repStudent").value;
+  if (!id) return toast("Add a student first.", true);
+  const q = new URLSearchParams();
+  if ($("repStart").value) q.set("start", $("repStart").value);
+  if ($("repEnd").value) q.set("end", $("repEnd").value);
+  try {
+    const d = await api(`/students/${id}/attendance?${q}`);
+    const s = d.summary;
+    const months = {};
+    d.records.forEach(r => (months[r.date.slice(0, 7)] ||= []).push(r));
+    const monthHtml = Object.keys(months).sort().map(m => {
+      const label = new Date(m + "-01T00:00:00").toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+      return `<div class="month"><h3>${label}</h3><div class="days">` +
+        months[m].map(r => `<div class="day ${esc(r.status)}" title="${esc(r.date)}: ${esc(r.status)}">${Number(r.date.slice(8))}</div>`).join("") +
+        `</div></div>`;
+    }).join("");
+    $("repOut").innerHTML = `
+      <div class="profile">
+        <div class="ring ${s.percentage < 75 ? "low" : ""}" style="--p:${s.percentage}"><span>${s.percentage}%</span></div>
+        <div>
+          <h2>${esc(s.name)}</h2>
+          <div style="color:var(--ink-soft)">Roll no. ${esc(s.roll_no)}</div>
+          <div class="counts">
+            <div><b>${s.total_days}</b>days</div>
+            <div><b style="color:var(--present)">${s.present}</b>present</div>
+            <div><b style="color:var(--late)">${s.late}</b>late</div>
+            <div><b style="color:var(--absent)">${s.absent}</b>absent</div>
+          </div>
+        </div>
+      </div>
+      <div class="key"><span><i style="background:var(--present)"></i>Present</span><span><i style="background:var(--late)"></i>Late</span><span><i style="background:var(--absent)"></i>Absent</span></div>
+      ${monthHtml || `<p class="sub">No attendance has been recorded for this student yet.</p>`}`;
+  } catch (e) { toast(e.message, true); }
+}
+$("showReport").onclick = showReport;
+
+/* ---------- overview ---------- */
+async function loadOverview() {
+  const rows = await api("/reports/summary");
+  const thr = Number($("thr").value) || 0;
+  $("ovBody").innerHTML = rows.map(s => {
+    const low = s.total_days && s.percentage < thr;
+    return `<tr><td class="roll">${esc(s.roll_no)}</td>
+      <td><a onclick="openReport(${s.student_id})">${esc(s.name)}</a></td>
+      <td>${s.total_days}</td><td>${s.absent}</td>
+      <td><div class="meter ${low ? "low" : ""}"><div style="width:${s.percentage}%"></div></div></td>
+      <td class="pct" style="color:${low ? "var(--absent)" : "inherit"}">${s.percentage}%</td></tr>`;
+  }).join("") || `<tr><td class="empty" colspan="6">No students yet.</td></tr>`;
+}
+$("thr").oninput = loadOverview;
+
+/* ---------- start ---------- */
+$("rollDate").value = new Date().toISOString().slice(0, 10);
+loadStudents().then(loadRoll);
+</script>
+</body>
+</html>
